@@ -28,10 +28,6 @@ def load_geotechnical_model():
     model = CLIPModel.from_pretrained(model_id)
     return model, processor
 
-# Lazy load the model inside a spinner when the app renders
-with st.spinner("Loading AI model weights... Please wait."):
-    model, processor = load_geotechnical_model()
-
 st.title("🏗️ Geotechnical Soil Classification System v1.0.1")
 st.write("Upload a field or laboratory specimen photo for automated visual analysis backed by **Dynamic Adaptive Thresholding and Regional Geological Mapping**.")
 
@@ -130,26 +126,6 @@ GEOLOGICAL_DATABASE = {
     "akure": "Laterite", "ilesha": "Laterite", "owo": "Laterite", "ondo": "Laterite"
 }
 
-import streamlit as st
-from transformers import CLIPModel, CLIPProcessor
-
-@st.cache_resource
-def load_geotechnical_model():
-    """Loads and caches the zero-shot CLIP model and processor."""
-    model_id = "openai/clip-vit-base-patch32"
-    
-    # Load processor and model
-    processor = CLIPProcessor.from_pretrained(model_id)
-    model = CLIPModel.from_pretrained(model_id)
-    
-    return model, processor
-
-# Call the cached function at the entry point of your app
-with st.spinner("Loading AI model weights... Please wait."):
-    model, processor = load_geotechnical_model()
-
-labels = config["labels"]
-
 # Explicitly define core and universal exclusion prompts to guarantee they evaluate
 core_prompts = [
     "A close-up photo of dry black cotton soil with characteristic shrinkage cracks",
@@ -167,6 +143,7 @@ exclusion_prompts = [
 ]
 
 all_prompts = core_prompts + exclusion_prompts
+
 st.subheader("📍 Step 1: Regional Location Parameters (Optional)")
 location_input = st.text_input(
     "Enter State, Local Government Area (LGA), or Borrow Pit/Town Name if known:", 
@@ -198,7 +175,10 @@ if uploaded_file is not None:
         st.session_state.has_run = False
 
     if st.button("🔬 Classify & Evaluate Geotechnical Grade", type="primary"):
-        with st.spinner("Stage 1: Running primary computer vision evaluation..."):
+        with st.spinner("Loading AI model weights & running evaluation..."):
+            # Lazy load model only on button click to keep startup lightning fast
+            model, processor = load_geotechnical_model()
+            
             inputs = processor(text=all_prompts, images=image, return_tensors="pt", padding=True)
             with torch.no_grad():
                 outputs = model(**inputs)
