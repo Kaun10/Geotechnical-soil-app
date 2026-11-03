@@ -1,0 +1,21 @@
+{
+  "labels": [
+    "Black_cotton_soil",
+    "Gravel",
+    "Laterite",
+    "Sand"
+  ],
+  "core_prompts": [
+    "A close-up photo of dry black cotton soil with characteristic shrinkage cracks",
+    "A close-up photo of well-graded gravel aggregate and coarse rock fragments",
+    "A close-up photo of tropical laterite soil with a reddish-brown clay matrix",
+    "A close-up photo of clean, loose construction sand"
+  ],
+  "exclusion_prompts": [
+    "A photo of a human face, person, or human body parts",
+    "A photo of a human hand holding an object",
+    "A photo of an indoor room, office space, furniture, or man-made electronics",
+    "A photo of an everyday object, vehicle, or item that is not a geological soil specimen",
+    "A blank, blurry, out-of-focus, or dark image with no clear texture"
+  ]
+}
