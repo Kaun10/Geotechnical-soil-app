@@ -112,20 +112,23 @@ GEOLOGICAL_DATABASE = {
     "akure": "Laterite", "ilesha": "Laterite", "owo": "Laterite", "ondo": "Laterite"
 }
 
-@st.cache_resource
-def load_clip_model():
-    model_id = "openai/clip-vit-base-patch32"
-    model = CLIPModel.from_pretrained(model_id)
-    processor = CLIPProcessor.from_pretrained(model_id)
-    
-    config_path = os.path.join(BASE_DIR, "prompt_config.json")
-    with open(config_path, "r", encoding="utf-8") as f:
-        config = json.load(f)
-        
-    return model, processor, config
+import streamlit as st
+from transformers import CLIPModel, CLIPProcessor
 
-with st.spinner("Initializing classification engine from local disk..."):
-    model, processor, config = load_clip_model()
+@st.cache_resource
+def load_geotechnical_model():
+    """Loads and caches the zero-shot CLIP model and processor."""
+    model_id = "openai/clip-vit-base-patch32"
+    
+    # Load processor and model
+    processor = CLIPProcessor.from_pretrained(model_id)
+    model = CLIPModel.from_pretrained(model_id)
+    
+    return model, processor
+
+# Call the cached function at the entry point of your app
+with st.spinner("Loading AI model weights... Please wait."):
+    model, processor = load_geotechnical_model()
 
 labels = config["labels"]
 
