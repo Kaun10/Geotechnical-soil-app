@@ -7,18 +7,30 @@ import streamlit as st
 from PIL import Image
 from transformers import CLIPProcessor, CLIPModel
 
-# Load prompt configuration for soil labels
-with open("prompt_config.json", "r") as f:
-    config = json.load(f)
-
-labels = config["labels"]
-
-# Page Setup
+# Page Setup (MUST be first Streamlit command)
 st.set_page_config(
     page_title="Geotechnical Soil Classification System 1.0.1",
     page_icon="🏗️",
     layout="centered"
 )
+
+# Load prompt configuration for soil labels safely
+with open("prompt_config.json", "r") as f:
+    config = json.load(f)
+
+labels = config["labels"]
+
+@st.cache_resource
+def load_geotechnical_model():
+    """Loads and caches the zero-shot CLIP model and processor."""
+    model_id = "openai/clip-vit-base-patch32"
+    processor = CLIPProcessor.from_pretrained(model_id)
+    model = CLIPModel.from_pretrained(model_id)
+    return model, processor
+
+# Lazy load the model inside a spinner when the app renders
+with st.spinner("Loading AI model weights... Please wait."):
+    model, processor = load_geotechnical_model()
 
 st.title("🏗️ Geotechnical Soil Classification System v1.0.1")
 st.write("Upload a field or laboratory specimen photo for automated visual analysis backed by **Dynamic Adaptive Thresholding and Regional Geological Mapping**.")
