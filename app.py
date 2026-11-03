@@ -190,7 +190,7 @@ else:
 if uploaded_file is not None:
     image = Image.open(uploaded_file).convert("RGB")
     image.thumbnail((800, 800))
-    st.image(image, caption="Input Specimen Matrix", use_container_width=True)
+    st.image(image, caption="Input Specimen Matrix", width="stretch")
     
     # Initialize session state for this image if not present
     if "last_file" not in st.session_state or st.session_state.last_file != getattr(uploaded_file, 'name', 'camera_capture'):
