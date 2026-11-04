@@ -1,6 +1,7 @@
-torch
-pillow
-transformers
 streamlit
+torch
+transformers
+pillow
 numpy
 opencv-python-headless
+fpdf2

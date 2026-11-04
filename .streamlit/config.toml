@@ -1,0 +1,8 @@
+[browser]
+gatherUsageStats = false
+
+[server]
+enableCORS = false
+enableXsrfProtection = true
+# Forces clean state reload on WebSocket reconnects
+maxMessageSize = 200
