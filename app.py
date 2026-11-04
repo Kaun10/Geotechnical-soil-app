@@ -46,6 +46,9 @@ BASE_THRESHOLD = st.sidebar.slider(
     step=5.0,
     help="The baseline confidence required for immediate visual validation."
 )
+# --- Add Sidebar Footer Here ---
+st.sidebar.markdown("---")
+st.sidebar.caption("🏗️ **Geotechnical AI v1.0.1**\nDeveloped by Kaun")
 
 # Geotechnical Knowledge Base
 GEOTECHNICAL_DATA = {
