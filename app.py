@@ -173,6 +173,19 @@ def generate_live_pdf_report(
     soil_type, confidence, uscs, aashto, subgrade_rating, 
     drainage, shrink_swell, recommendation, location_str="Makurdi Site Corridor", img_path=None
 ):
+    # Sanitize text to remove unicode bullets or dashes that break standard FPDF fonts
+    def clean_text(txt):
+        if not txt:
+            return ""
+        return (str(txt)
+                .replace("•", "*")
+                .replace("—", "-")
+                .replace("–", "-")
+                .replace("“", '"')
+                .replace("”", '"')
+                .replace("‘", "'")
+                .replace("’", "'"))
+
     pdf = GeotechnicalPDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -188,7 +201,7 @@ def generate_live_pdf_report(
     pdf.cell(50, 6, "Date / Time:", border=1)
     pdf.cell(140, 6, timestamp, border=1, new_x="LMARGIN", new_y="NEXT")
     pdf.cell(50, 6, "Site Location / Region:", border=1)
-    pdf.cell(140, 6, str(location_str), border=1, new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(140, 6, clean_text(location_str), border=1, new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
 
     # 2. Specimen Visual Record Section
@@ -207,7 +220,7 @@ def generate_live_pdf_report(
     pdf.cell(0, 7, "3. Primary Classification Metrics", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", "", 10)
     pdf.cell(50, 6, "Predicted Soil Class:", border=1)
-    pdf.cell(140, 6, f"{soil_type}", border=1, new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(140, 6, clean_text(soil_type), border=1, new_x="LMARGIN", new_y="NEXT")
     pdf.cell(50, 6, "Confidence Score:", border=1)
     pdf.cell(140, 6, f"{confidence:.1f}% (Vision Engine + OpenAI CLIP)", border=1, new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
@@ -217,20 +230,20 @@ def generate_live_pdf_report(
     pdf.cell(0, 7, "4. Standard Geotechnical Indexing", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", "", 10)
     pdf.cell(50, 6, "USCS Group Symbol:", border=1)
-    pdf.cell(140, 6, uscs, border=1, new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(140, 6, clean_text(uscs), border=1, new_x="LMARGIN", new_y="NEXT")
     pdf.cell(50, 6, "AASHTO Classification:", border=1)
-    pdf.cell(140, 6, aashto, border=1, new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(140, 6, clean_text(aashto), border=1, new_x="LMARGIN", new_y="NEXT")
     pdf.cell(50, 6, "Subgrade Rating:", border=1)
-    pdf.cell(140, 6, subgrade_rating, border=1, new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(140, 6, clean_text(subgrade_rating), border=1, new_x="LMARGIN", new_y="NEXT")
     pdf.cell(50, 6, "Drainage / Shrink-Swell:", border=1)
-    pdf.cell(140, 6, f"{drainage} | Shrink/Swell: {shrink_swell}", border=1, new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(140, 6, clean_text(f"{drainage} | Shrink/Swell: {shrink_swell}"), border=1, new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
 
     # 5. Engineering Recommendations & Site Considerations
     pdf.set_font("Helvetica", "B", 11)
     pdf.cell(0, 7, "5. Engineering Recommendations & Site Considerations", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", "", 9.5)
-    pdf.multi_cell(0, 6, txt=recommendation, border=1)
+    pdf.multi_cell(0, 6, txt=clean_text(recommendation), border=1)
 
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     pdf.output(temp_file.name)
