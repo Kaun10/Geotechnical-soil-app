@@ -25,6 +25,7 @@ with open("prompt_config.json", "r") as f:
     config = json.load(f)
 
 labels = config["labels"]
+core_prompts = config["prompts"]
 
 @st.cache_resource
 def load_geotechnical_model():
@@ -66,9 +67,9 @@ GEOTECHNICAL_DATA = {
         "drainage": "Impermeable / Very Poor",
         "shrink_swell": "High to Extreme (Expansive Soil)",
         "engineering_notes": (
-            "• **Foundations:** Unsuitable for shallow footings without ground improvement. Recommend deep piers/piles or raft foundations.\n"
-            "• **Pavements:** High heave risk. Requires subgrade lime/cement stabilization or removal/replacement with inert fill.\n"
-            "• **Slope Stability:** High plastic deformation and swelling pressure when saturated."
+            "• Foundations: Unsuitable for shallow footings without ground improvement. Recommend deep piers/piles or raft foundations.\n"
+            "• Pavements: High heave risk. Requires subgrade lime/cement stabilization or removal/replacement with inert fill.\n"
+            "• Slope Stability: High plastic deformation and swelling pressure when saturated."
         )
     },
     "Gravel": {
@@ -78,9 +79,9 @@ GEOTECHNICAL_DATA = {
         "drainage": "Excellent / High Permeability",
         "shrink_swell": "Negligible / Non-Expansive",
         "engineering_notes": (
-            "• **Foundations:** Excellent bearing capacity for shallow footings and structural foundations.\n"
-            "• **Pavements:** Ideal subgrade and base course material for heavy load-bearing pavements.\n"
-            "• **Compaction:** Compacts readily under heavy vibratory rollers with minimal moisture sensitivity."
+            "• Foundations: Excellent bearing capacity for shallow footings and structural foundations.\n"
+            "• Pavements: Ideal subgrade and base course material for heavy load-bearing pavements.\n"
+            "• Compaction: Compacts readily under heavy vibratory rollers with minimal moisture sensitivity."
         )
     },
     "Laterite": {
@@ -90,9 +91,9 @@ GEOTECHNICAL_DATA = {
         "drainage": "Moderate to Low",
         "shrink_swell": "Low to Moderate",
         "engineering_notes": (
-            "• **Foundations:** Adequate bearing capacity when undisturbed and dry; loses strength rapidly if inundated.\n"
-            "• **Pavements:** Widely used as road base/sub-base in tropical construction when properly compacted.\n"
-            "• **Erosion:** Vulnerable to severe surface erosion and gullying under heavy rainfall if slope is exposed."
+            "• Foundations: Adequate bearing capacity when undisturbed and dry; loses strength rapidly if inundated.\n"
+            "• Pavements: Widely used as road base/sub-base in tropical construction when properly compacted.\n"
+            "• Erosion: Vulnerable to severe surface erosion and gullying under heavy rainfall if slope is exposed."
         )
     },
     "Sand": {
@@ -102,9 +103,21 @@ GEOTECHNICAL_DATA = {
         "drainage": "Good to Rapid",
         "shrink_swell": "Non-Expansive",
         "engineering_notes": (
-            "• **Foundations:** Good bearing capacity when confined/compacted. Vulnerable to scour and wind erosion.\n"
-            "• **Pavements:** Stable subgrade material; requires confinement to prevent lateral displacement.\n"
-            "• **Seismic Hazard:** High risk of **soil liquefaction** under dynamic/earthquake loading if saturated."
+            "• Foundations: Good bearing capacity when confined/compacted. Vulnerable to scour and wind erosion.\n"
+            "• Pavements: Stable subgrade material; requires confinement to prevent lateral displacement.\n"
+            "• Seismic Hazard: High risk of soil liquefaction under dynamic/earthquake loading if saturated."
+        )
+    },
+    "Unknown_Soil": {
+        "uscs_symbol": "Unclassified (Non-Standard Matrix)",
+        "aashto": "Unrated / Special Study Required",
+        "subgrade_rating": "Undefined (Requires Laboratory Testing)",
+        "drainage": "Variable / Unknown",
+        "shrink_swell": "Unknown - Preliminary Assessment Unavailable",
+        "engineering_notes": (
+            "• Foundations: Standard presumptive bearing capacities do not apply without index testing.\n"
+            "• Pavements: Unsuitable for use as subgrade or base material until full laboratory soil mechanics testing is completed.\n"
+            "• Recommendation: Submit physical bag and core samples to an approved geotechnical testing laboratory."
         )
     }
 }
@@ -136,14 +149,7 @@ GEOLOGICAL_DATABASE = {
     "akure": "Laterite", "ilesha": "Laterite", "owo": "Laterite", "ondo": "Laterite"
 }
 
-# Explicitly define core and universal exclusion prompts
-core_prompts = [
-    "A close-up photo of dry black cotton soil with characteristic shrinkage cracks",
-    "A close-up photo of well-graded gravel aggregate and coarse rock fragments",
-    "A close-up photo of tropical laterite soil with a reddish-brown clay matrix",
-    "A close-up photo of clean, loose construction sand"
-]
-
+# Universal Exclusion Prompts
 exclusion_prompts = [
     "A photo of a human face, person, or human body parts",
     "A photo of a human hand holding an object",
@@ -154,7 +160,7 @@ exclusion_prompts = [
 
 all_prompts = core_prompts + exclusion_prompts
 
-# --- PDF Exporter Class Definition ---
+# --- PDF Exporter Class & Sanitizer ---
 class GeotechnicalPDF(FPDF):
     def header(self):
         self.set_font("Helvetica", "B", 14)
@@ -171,9 +177,8 @@ class GeotechnicalPDF(FPDF):
 
 def generate_live_pdf_report(
     soil_type, confidence, uscs, aashto, subgrade_rating, 
-    drainage, shrink_swell, recommendation, location_str="Makurdi Site Corridor", img_path=None
+    drainage, shrink_swell, recommendation, location_str="Unspecified Site", sample_id="SMP-001", img_path=None
 ):
-    # Sanitize text to remove unicode bullets or dashes that break standard FPDF fonts
     def clean_text(txt):
         if not txt:
             return ""
@@ -200,6 +205,8 @@ def generate_live_pdf_report(
     pdf.cell(140, 6, f"Geotechnical Soil Classification System {APP_VERSION}", border=1, new_x="LMARGIN", new_y="NEXT")
     pdf.cell(50, 6, "Date / Time:", border=1)
     pdf.cell(140, 6, timestamp, border=1, new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(50, 6, "Sample ID:", border=1)
+    pdf.cell(140, 6, clean_text(sample_id), border=1, new_x="LMARGIN", new_y="NEXT")
     pdf.cell(50, 6, "Site Location / Region:", border=1)
     pdf.cell(140, 6, clean_text(location_str), border=1, new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
@@ -250,11 +257,21 @@ def generate_live_pdf_report(
     return temp_file.name
 
 # --- Main App Interface Layout ---
-st.subheader("📍 Step 1: Regional Location Parameters (Optional)")
-location_input = st.text_input(
-    "Enter State, Local Government Area (LGA), or Borrow Pit/Town Name if known:", 
-    key="loc_field"
-).strip().lower()
+st.subheader("📍 Step 1: Regional Location & Metadata (Optional)")
+col1, col2 = st.columns(2)
+with col1:
+    location_input = st.text_input(
+        "State, LGA, or Town/Borrow Pit Name:", 
+        placeholder="e.g., Makurdi, Deba, Abuja",
+        key="loc_field"
+    ).strip().lower()
+with col2:
+    sample_id_input = st.text_input(
+        "Sample Identification Code:", 
+        placeholder="e.g., SMP-001",
+        value="SMP-001",
+        key="sample_id_field"
+    ).strip()
 
 st.subheader("📸 Step 2: Specimen Visual Input")
 input_method = st.radio(
@@ -280,7 +297,6 @@ if uploaded_file is not None:
     image.save(temp_img_file.name)
     st.session_state.temp_img_path = temp_img_file.name
 
-    # Initialize session state for this image if not present
     if "last_file" not in st.session_state or st.session_state.last_file != getattr(uploaded_file, 'name', 'camera_capture'):
         st.session_state.last_file = getattr(uploaded_file, 'name', 'camera_capture')
         st.session_state.has_run = False
@@ -323,7 +339,10 @@ if uploaded_file is not None:
             )
         elif top_score >= BASE_THRESHOLD:
             final_class = labels[top_idx]
-            st.success(f"📌 **Predicted Class via Vision Engine: {final_class.replace('_', ' ')}**")
+            if final_class == "Unknown_Soil":
+                st.warning("⚠️ **Visual Match Notice:** Specimen closely matches unclassified/unknown structural profiles.")
+            else:
+                st.success(f"📌 **Predicted Class via Vision Engine: {final_class.replace('_', ' ')}**")
             st.metric(label="Computer Vision Confidence Score", value=f"{top_score:.2f}%")
         else:
             st.warning(
@@ -366,7 +385,12 @@ if uploaded_file is not None:
             st.write("Answer the following mechanical properties to dynamically update system certainty thresholds.")
             matrix_selection = st.radio(
                 "Identify dominant structural matrix behavior:",
-                ["Select Matrix...", "Cohesive (Clay-rich, forms molded shapes when damp)", "Non-Cohesive (Granular, loose, falls apart instantly)"],
+                [
+                    "Select Matrix...", 
+                    "Cohesive (Clay-rich, forms molded shapes when damp)", 
+                    "Non-Cohesive (Granular, loose, falls apart instantly)",
+                    "Unlisted / Other Soil Type (Organic, Peat, Silt, or Mixed)"
+                ],
                 key="matrix_selection_radio"
             )
             if matrix_selection.startswith("Cohesive"):
@@ -389,10 +413,22 @@ if uploaded_file is not None:
                 elif n2:
                     final_class = "Gravel"
                     st.success("⚡ Adaptive Threshold Reached: Mechanical interlock and grain scale satisfies coarse gravel indexing.")
+            elif matrix_selection.startswith("Unlisted"):
+                final_class = "Unknown_Soil"
+                st.info("ℹ️ User override activated: Specimen designated as an unlisted geotechnical soil class.")
 
         if final_class:
-            st.subheader(f"🏗️ Engineering Geotechnical Evaluation: {final_class.replace('_', ' ')}")
-            geo = GEOTECHNICAL_DATA.get(final_class, {})
+            if final_class == "Unknown_Soil":
+                st.warning(
+                    "⚠️ **Classification Notice: Unlisted / Unknown Soil Specimen**\n\n"
+                    "The specimen does not match standard regional parameters for Sand, Gravel, Laterite, or Black Cotton Soil. "
+                    "Full laboratory index testing (Hydrometer, Atterberg Limits, and Particle Size Distribution) is strictly required."
+                )
+                geo = GEOTECHNICAL_DATA["Unknown_Soil"]
+            else:
+                st.subheader(f"🏗️ Engineering Geotechnical Evaluation: {final_class.replace('_', ' ')}")
+                geo = GEOTECHNICAL_DATA.get(final_class, {})
+
             col1, col2 = st.columns(2)
             with col1:
                 st.write(f"USCS Symbol: {geo.get('uscs_symbol')}")
@@ -419,7 +455,8 @@ if uploaded_file is not None:
                     drainage=geo.get('drainage', 'N/A'),
                     shrink_swell=geo.get('shrink_swell', 'N/A'),
                     recommendation=geo.get('engineering_notes', 'N/A'),
-                    location_str=location_input.title() if location_input else "Makurdi Site Corridor / FCTA",
+                    location_str=location_input.title() if location_input else "Unspecified Site Location",
+                    sample_id=sample_id_input if sample_id_input else "SMP-001",
                     img_path=st.session_state.get('temp_img_path', None)
                 )
                 
@@ -437,5 +474,5 @@ if uploaded_file is not None:
         st.markdown("---")
         st.subheader("📊 Primary CLIP Visual Probability Layout")
         for idx, name in enumerate(labels):
-            st.write(f"{name}: {probs[idx]:.2f}%")
+            st.write(f"{name.replace('_', ' ')}: {probs[idx]:.2f}%")
             st.progress(int(probs[idx]))

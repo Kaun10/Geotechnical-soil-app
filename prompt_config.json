@@ -3,13 +3,15 @@
     "Black_cotton_soil",
     "Gravel",
     "Laterite",
-    "Sand"
+    "Sand",
+    "Unknown_Soil"
   ],
-  "core_prompts": [
+  "prompts": [
     "A close-up photo of dry black cotton soil with characteristic shrinkage cracks",
     "A close-up photo of well-graded gravel aggregate and coarse rock fragments",
     "A close-up photo of tropical laterite soil with a reddish-brown clay matrix",
-    "A close-up photo of clean, loose construction sand"
+    "A close-up photo of clean, loose construction sand",
+    "A close-up photo of an unclassified, unknown, or unconventional soil type that does not match standard engineering categories"
   ],
   "exclusion_prompts": [
     "A photo of a human face, person, or human body parts",
