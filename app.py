@@ -2,6 +2,8 @@ import os
 import json
 import torch
 import cv2
+import base64
+import requests
 import numpy as np
 import streamlit as st
 from PIL import Image
@@ -20,8 +22,14 @@ st.set_page_config(
     layout="centered"
 )
 
+# Resolve paths before loading config or defining model loader
+BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if "__file__" in locals() else os.getcwd()
+MODEL_PATH = os.path.join(BASE_DIR, "saved_clip_soil_model")
+SUGGESTIONS_FILE = os.path.join(BASE_DIR, "location_suggestions.csv")
+PROMPT_CONFIG_PATH = os.path.join(BASE_DIR, "prompt_config.json")
+
 # Load prompt configuration for soil labels safely
-with open("prompt_config.json", "r") as f:
+with open(PROMPT_CONFIG_PATH, "r", encoding="utf-8") as f:
     config = json.load(f)
 
 labels = config["labels"]
@@ -29,20 +37,16 @@ core_prompts = config["prompts"]
 
 @st.cache_resource
 def load_geotechnical_model():
-    """Loads and caches the zero-shot CLIP model and processor."""
-    model_id = "openai/clip-vit-base-patch32"
-    processor = CLIPProcessor.from_pretrained(model_id)
-    model = CLIPModel.from_pretrained(model_id)
+    """Loads CLIP from local MODEL_PATH if available, falling back to Hugging Face."""
+    has_local = os.path.isdir(MODEL_PATH) and os.path.isfile(os.path.join(MODEL_PATH, "config.json"))
+    source = MODEL_PATH if has_local else "openai/clip-vit-base-patch32"
+    processor = CLIPProcessor.from_pretrained(source, local_files_only=has_local)
+    model = CLIPModel.from_pretrained(source, local_files_only=has_local)
     return model, processor
 
 # --- 2. Update st.title to use the version variable ---
 st.title(f"🏗️ Geotechnical Soil Classification System {APP_VERSION}")
 st.write("Upload a field or laboratory specimen photo for automated visual analysis backed by **Dynamic Adaptive Thresholding and Regional Geological Mapping**.")
-
-# Dynamic path resolution for standalone EXE compatibility
-BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if "__file__" in locals() else os.getcwd()
-MODEL_PATH = os.path.join(BASE_DIR, "saved_clip_soil_model")
-SUGGESTIONS_FILE = os.path.join(BASE_DIR, "location_suggestions.csv")
 
 # Sidebar Controls for Field Adjustments
 st.sidebar.header("⚙️ System Guardrails")
@@ -54,6 +58,7 @@ BASE_THRESHOLD = st.sidebar.slider(
     step=5.0,
     help="The baseline confidence required for immediate visual validation."
 )
+
 # --- Sidebar Footer ---
 st.sidebar.markdown("---")
 st.sidebar.caption(f"🏗️ **Geotechnical AI {APP_VERSION}**\nDeveloped by Kaun")
@@ -256,6 +261,76 @@ def generate_live_pdf_report(
     pdf.output(temp_file.name)
     return temp_file.name
 
+def append_suggestion_to_github(row_line: str, location_name: str) -> None:
+    """Appends a CSV row to the configured file in GitHub via Contents API."""
+    try:
+        token = st.secrets.get("GITHUB_TOKEN", "")
+        repo = st.secrets.get("GITHUB_REPO", "")
+        branch = st.secrets.get("GITHUB_BRANCH", "main")
+        repo_path = st.secrets.get("SUGGESTIONS_REPO_PATH", "location_suggestions.csv")
+    except Exception:
+        return
+
+    if not token or not repo:
+        return
+
+    api_url = f"https://api.github.com/repos/{repo}/contents/{repo_path}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+    }
+
+    header_line = '"timestamp","sample_id","location","app_version"\n'
+    existing_text = header_line
+    file_sha = None
+
+    try:
+        get_resp = requests.get(api_url, headers=headers, params={"ref": branch}, timeout=10)
+        if get_resp.status_code == 200:
+            payload = get_resp.json()
+            file_sha = payload.get("sha")
+            encoded_content = payload.get("content", "")
+            if encoded_content:
+                existing_text = base64.b64decode(encoded_content).decode("utf-8")
+                if existing_text and not existing_text.endswith("\n"):
+                    existing_text += "\n"
+        elif get_resp.status_code != 404:
+            return
+
+        updated_text = existing_text + row_line
+        put_body = {
+            "message": f"Log suggested location: {location_name}",
+            "content": base64.b64encode(updated_text.encode("utf-8")).decode("utf-8"),
+            "branch": branch,
+        }
+        if file_sha:
+            put_body["sha"] = file_sha
+
+        requests.put(api_url, headers=headers, json=put_body, timeout=10)
+    except Exception:
+        pass
+
+def log_location_suggestion(sug_loc: str, sample_id: str = "SMP-001") -> bool:
+    """Writes suggestion to local CSV and syncs to GitHub if secrets are set."""
+    cleaned = sug_loc.replace('"', "'").strip()
+    if not cleaned:
+        return False
+
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    row_line = f'"{timestamp}","{sample_id}","{cleaned}","{APP_VERSION}"\n'
+
+    try:
+        file_exists = os.path.exists(SUGGESTIONS_FILE) and os.path.getsize(SUGGESTIONS_FILE) > 0
+        with open(SUGGESTIONS_FILE, "a", encoding="utf-8") as sf:
+            if not file_exists:
+                sf.write('"timestamp","sample_id","location","app_version"\n')
+            sf.write(row_line)
+    except OSError:
+        pass
+
+    append_suggestion_to_github(row_line, cleaned)
+    return True
+
 # --- Main App Interface Layout ---
 st.subheader("📍 Step 1: Regional Location & Metadata (Optional)")
 col1, col2 = st.columns(2)
@@ -369,15 +444,14 @@ if uploaded_file is not None:
                     sug_col1, sug_col2 = st.columns([3, 1])
                     with sug_col1:
                         sug_loc = st.text_input(
-                            "Confirm Location String for database review:", 
-                            value=location_input.title(), 
+                            "Confirm Location String for database review:",
+                            value=location_input.title(),
                             label_visibility="collapsed",
                             key="sug_input_field"
                         )
                     with sug_col2:
                         if st.button("💾 Submit"):
-                            with open(SUGGESTIONS_FILE, "a", encoding="utf-8") as sf:
-                                sf.write(f'"{sug_loc.replace(chr(34), chr(39))}"\n')
+                            log_location_suggestion(sug_loc, sample_id_input or "SMP-001")
                             st.toast("Location logged safely for monthly verification routine!", icon="💾")
 
         if not location_verified and top_idx < len(core_prompts) and top_score < BASE_THRESHOLD:
@@ -386,8 +460,8 @@ if uploaded_file is not None:
             matrix_selection = st.radio(
                 "Identify dominant structural matrix behavior:",
                 [
-                    "Select Matrix...", 
-                    "Cohesive (Clay-rich, forms molded shapes when damp)", 
+                    "Select Matrix...",
+                    "Cohesive (Clay-rich, forms molded shapes when damp)",
                     "Non-Cohesive (Granular, loose, falls apart instantly)",
                     "Unlisted / Other Soil Type (Organic, Peat, Silt, or Mixed)"
                 ],
