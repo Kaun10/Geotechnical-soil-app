@@ -201,31 +201,49 @@ def generate_live_pdf_report(
     pdf.set_auto_page_break(auto=True, margin=15)
     
     # 1. Project & Specimen Metadata
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(0, 7, "1. Project & Specimen Metadata", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font("Helvetica", "", 10)
-    
+    pdf.set_font("Helvetica", "B", 10.5)
+    pdf.cell(0, 6, "1. Project & Specimen Metadata", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", "", 9.5)
+
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    pdf.cell(50, 6, "System Version:", border=1)
-    pdf.cell(140, 6, f"Geotechnical Soil Classification System {APP_VERSION}", border=1, new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(50, 6, "Date / Time:", border=1)
-    pdf.cell(140, 6, timestamp, border=1, new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(50, 6, "Sample ID:", border=1)
-    pdf.cell(140, 6, clean_text(sample_id), border=1, new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(50, 6, "Site Location / Region:", border=1)
-    pdf.cell(140, 6, clean_text(location_str), border=1, new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(4)
+    pdf.cell(48, 5.5, "System Version:", border=1)
+    pdf.cell(142, 5.5, f"Geotechnical Soil Classification System {APP_VERSION}", border=1, new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(48, 5.5, "Date / Time:", border=1)
+    pdf.cell(142, 5.5, timestamp, border=1, new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(48, 5.5, "Sample ID:", border=1)
+    pdf.cell(142, 5.5, clean_text(sample_id), border=1, new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(48, 5.5, "Site Location / Region:", border=1)
+    pdf.cell(142, 5.5, clean_text(location_str), border=1, new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(2.5)
 
     # 2. Specimen Visual Record Section
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(0, 7, "2. Specimen Visual Record", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", "B", 10.5)
+    pdf.cell(0, 6, "2. Specimen Visual Record", new_x="LMARGIN", new_y="NEXT")
     if img_path and os.path.exists(img_path):
-        pdf.image(img_path, x=10, y=pdf.get_y(), w=45)
-        pdf.ln(35)
+        max_w = 50.0
+        max_h = 34.0
+        with Image.open(img_path) as im:
+            orig_w, orig_h = im.size
+        aspect = orig_w / max(orig_h, 1)
+
+        draw_w = max_w
+        draw_h = draw_w / aspect
+        if draw_h > max_h:
+            draw_h = max_h
+            draw_w = draw_h * aspect
+
+        if pdf.get_y() + draw_h + 6 > pdf.page_break_trigger:
+            pdf.add_page()
+            pdf.set_font("Helvetica", "B", 10.5)
+            pdf.cell(0, 6, "2. Specimen Visual Record (Cont.)", new_x="LMARGIN", new_y="NEXT")
+
+        start_y = pdf.get_y()
+        pdf.image(img_path, x=pdf.l_margin, y=start_y, w=draw_w, h=draw_h)
+        pdf.set_xy(pdf.l_margin, start_y + draw_h + 3.0)
     else:
         pdf.set_font("Helvetica", "I", 9)
-        pdf.cell(0, 6, "[ Visual Matrix Captured Successfully ]", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(2)
+        pdf.cell(0, 5.5, "[ Visual Matrix Captured Successfully ]", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(1.5)
 
     # 3. Primary Classification Metrics
     pdf.set_font("Helvetica", "B", 11)
